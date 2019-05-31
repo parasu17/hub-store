@@ -5,6 +5,10 @@
 *.so
 *.dylib
 
+# Editor and go temporary files & folders
+.swp
+vendor
+
 # Test binary, build with `go test -c`
 *.test
 
@@ -14,3 +18,4 @@
 .DS_Store
 docs/build
 bin
+coverage.txt

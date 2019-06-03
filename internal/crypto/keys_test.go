@@ -33,7 +33,7 @@ func TestKeyProviderFromFile(t *testing.T) {
 	cryptText, err := jwe.CompactSerialize()
 	require.NoError(t, err, "Failed to serialized JWE")
 
-	// Decrypt
+	// Decrypt the encrypted JWE
 	decryptKey := &KeyProviderFromFile{PrivKeyPath: "../../tests/keys/did-server/ec-key.pem"}
 	parsedJWE, err := jose.ParseEncrypted(cryptText)
 	require.NoError(t, err, fmt.Sprintf("Error parsing the encrypted text; err=%s", err))

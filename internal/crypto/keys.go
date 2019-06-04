@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 
@@ -14,16 +15,32 @@ var logger = logrus.New()
 type KeyProvider interface {
 	GetPrivateKey() (interface{}, error)
 	GetPublicKey() (interface{}, error)
+	GetRemotePublicKey(keyID string) (interface{}, error)
 }
 
 // KeyProviderFromFile is an implementation of KeyProvider interface which
 // reads the keys from files
 type KeyProviderFromFile struct {
-	PrivKeyPath string
-	PubKeyPath  string
-	BasePath    string
-	pvtKey      interface{}
-	pubKey      interface{}
+	PrivKeyPath  string
+	PubKeyPath   string
+	BasePath     string
+	pvtKey       interface{}
+	pubKey       interface{}
+	publicKeyMap map[string]interface{}
+}
+
+// AddPublicKeyPath adds the keyID-publicKey pair to this provider
+// If it is an unknown path or if the file is corrupted then an error is returned
+func (p *KeyProviderFromFile) AddPublicKeyPath(keyID, publicKeyPath string) error {
+	publicKey, err := p.getPublicKeyFromFile(publicKeyPath)
+	if err == nil {
+		if p.publicKeyMap == nil {
+			p.publicKeyMap = make(map[string]interface{})
+		}
+		p.publicKeyMap[keyID] = publicKey
+		return nil
+	}
+	return err
 }
 
 // GetPrivateKey gets the private key of the server
@@ -42,21 +59,6 @@ func (p *KeyProviderFromFile) GetPrivateKey() (interface{}, error) {
 	return pvKey, nil
 }
 
-// getPrivateKeyFromFile gets the private key from a file
-func (p *KeyProviderFromFile) getPrivateKeyFromFile(filePath string) (interface{}, error) {
-	keyBytes, err := ioutil.ReadFile(filepath.Clean(filePath))
-	if err != nil {
-		return nil, errors.Wrapf(err, "Crypto [Warning]: could not read private Key")
-	}
-
-	pvKey, err := ParsePrivateKey(keyBytes)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Crypto [Warning]: could not parse private Key")
-	}
-
-	return pvKey, nil
-}
-
 // GetPublicKey gets the client public key
 func (p *KeyProviderFromFile) GetPublicKey() (interface{}, error) {
 	if p.pubKey != nil {
@@ -70,6 +72,31 @@ func (p *KeyProviderFromFile) GetPublicKey() (interface{}, error) {
 	}
 	p.pubKey = pubKey
 	return pubKey, nil
+}
+
+// GetRemotePublicKey gets the public key of a remote entity
+func (p *KeyProviderFromFile) GetRemotePublicKey(keyID string) (interface{}, error) {
+	if p.publicKeyMap != nil {
+		if key, ok := p.publicKeyMap[keyID]; ok {
+			return key, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("Public Key not found for KeyID=%s", keyID))
+}
+
+// getPrivateKeyFromFile gets the private key from a file
+func (p *KeyProviderFromFile) getPrivateKeyFromFile(filePath string) (interface{}, error) {
+	keyBytes, err := ioutil.ReadFile(filepath.Clean(filePath))
+	if err != nil {
+		return nil, errors.Wrapf(err, "Crypto [Warning]: could not read private Key")
+	}
+
+	pvKey, err := ParsePrivateKey(keyBytes)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Crypto [Warning]: could not parse private Key")
+	}
+
+	return pvKey, nil
 }
 
 // getPublicKeyFromFile gets the client public key from a file

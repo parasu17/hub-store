@@ -34,9 +34,9 @@ type Authenticator struct {
 
 // AuthenticationResult is the authentication validation result returned by Authenticate() call
 type AuthenticationResult struct {
-	// AccessToken is the 'did-access-token' JWS header content of the HTTP request
+	// AccessToken is the 'did-access-token' in the JWS message
 	AccessToken string
-	// IsNewToken states if 'did-access-token' JWS header was empty in the client http request (false) or not (true, ie newly generated token by the server)
+	// IsNewToken is true, if the 'did-access-token' in the JWS message is empty and false otherwise
 	IsNewToken bool
 	// Payload holds the verified payload of the request
 	Payload string

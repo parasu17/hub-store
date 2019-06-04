@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/ecdsa"
 	"testing"
 	"time"
 
@@ -21,15 +22,16 @@ func TestGetJWSForInvalidAlgorithm(t *testing.T) {
 }
 
 func TestCreateNewAccessToken(t *testing.T) {
-	_, err := createNewAccessToken("", "", "", "", "", nil)
+	_, err := createNewAccessToken("", "", nil)
 	require.Error(t, err)
-	require.Equal(t, "Failed to create new signer for new access token JWS: square/go-jose: unsupported key type/format", err.Error())
+	require.Equal(t, "Failed to create new signer for new access token JWS: invalid private key", err.Error())
 }
 
 func TestValidateAccessToken(t *testing.T) {
 	kp := &crypto.KeyProviderFromFile{PrivKeyPath: "../../tests/keys/did-client/ec-key.pem"}
 	pvKey, _ := kp.GetPrivateKey()
-	key := jose.SigningKey{Algorithm: jose.ES256, Key: pvKey}
+	ecdsaKey := pvKey.(*ecdsa.PrivateKey)
+	key := jose.SigningKey{Algorithm: jose.ES256, Key: ecdsaKey}
 	var signerOpts = jose.SignerOptions{NonceSource: staticNonceSource("nonce")} // using passed in nonce
 	signer, _ := jose.NewSigner(key, signerOpts.WithType("JWT"))
 	builder := jwt.Signed(signer)
@@ -37,17 +39,17 @@ func TestValidateAccessToken(t *testing.T) {
 	issuedTime := time.Now().UTC()
 	expiryTime := issuedTime.Add(5 * time.Minute)
 	claims := jwt.Claims{
-		Issuer:    "issuer",
+		Issuer:    "Issuer", // the Issuer is given wrong
 		Subject:   "subject",
 		ID:        "id",
-		Audience:  jwt.Audience{"aud"},
+		Audience:  jwt.Audience{HubIssuerID},
 		NotBefore: jwt.NewNumericDate(issuedTime),
 		IssuedAt:  jwt.NewNumericDate(issuedTime),
 		Expiry:    jwt.NewNumericDate(expiryTime),
 	}
 	tok, _ := builder.Claims(claims).CompactSerialize()
 	authJWT, _ := jwt.ParseSigned(tok)
-	err := validateAccessToken(authJWT, pvKey, "subject", "id", "aud")
+	err := validateAccessToken(authJWT, ecdsaKey, "subject")
 	require.Error(t, err)
 }
 

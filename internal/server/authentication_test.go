@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package server
 
 import (
+	"crypto/ecdsa"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -278,8 +279,8 @@ func generateBadJWSAndValidJWE() (string, error) {
 
 func generateNewValidAccessToken(kid string) (string, error) {
 	pvKey, _ := serverKeys.GetPrivateKey()
-	// using 'kid' as aud
-	didAccessToken, err := createNewAccessToken("p6OLLpeRafCWbOAEYpuGVTKNkcq8l", HubIssuerID, "subject", "id", kid, pvKey)
+	ecdsaKey := pvKey.(*ecdsa.PrivateKey)
+	didAccessToken, err := createNewAccessToken("p6OLLpeRafCWbOAEYpuGVTKNkcq8l", kid, ecdsaKey)
 	return didAccessToken, err
 }
 

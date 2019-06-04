@@ -25,8 +25,7 @@ func (sns staticNonceSource) Nonce() (string, error) {
 }
 
 // createNewAccessToken will generate a new access token with the given nonce and using publicKey
-func createNewAccessToken(nonce, issuer, subject, id, aud string, pvKey interface{}) (string, error) {
-
+func createNewAccessToken(nonce, subject string, pvKey *ecdsa.PrivateKey) (string, error) {
 	// for now creating keys with ECDSA using P-256 and SHA-256
 	key := jose.SigningKey{Algorithm: jose.ES256, Key: pvKey}
 	var signerOpts = jose.SignerOptions{NonceSource: staticNonceSource(nonce)} // using passed in nonce
@@ -42,10 +41,10 @@ func createNewAccessToken(nonce, issuer, subject, id, aud string, pvKey interfac
 	issuedTime := time.Now().UTC()
 	expiryTime := issuedTime.Add(5 * time.Minute)
 	claims := jwt.Claims{
-		Issuer:    issuer,
+		Issuer:    HubIssuerID,
 		Subject:   subject,
-		ID:        id,
-		Audience:  jwt.Audience{aud},
+		ID:        "id", // TODO: to create a generated id
+		Audience:  jwt.Audience{HubIssuerID},
 		NotBefore: jwt.NewNumericDate(issuedTime),
 		IssuedAt:  jwt.NewNumericDate(issuedTime),
 		Expiry:    jwt.NewNumericDate(expiryTime),
@@ -54,17 +53,18 @@ func createNewAccessToken(nonce, issuer, subject, id, aud string, pvKey interfac
 	return builder.Claims(claims).CompactSerialize()
 }
 
-func validateAccessToken(accessToken *jwt.JSONWebToken, pvKey interface{}, subject, id, aud string) error {
+func validateAccessToken(accessToken *jwt.JSONWebToken, ecKey *ecdsa.PrivateKey, subject string) error {
 	resultClaims := jwt.Claims{}
+	err := accessToken.Claims(&ecKey.PublicKey, &resultClaims)
+	if err != nil {
+		return err
+	}
 
-	// hub-store supports only ECDSA keys (for now) - TODO add support for other key types later (when/if needed)
-	ecKey := pvKey.(*ecdsa.PrivateKey)
-	_ = accessToken.Claims(&ecKey.PublicKey, &resultClaims)
-	err := resultClaims.Validate(jwt.Expected{
+	err = resultClaims.Validate(jwt.Expected{
 		Issuer:   HubIssuerID,
-		Audience: jwt.Audience{aud},
+		Audience: jwt.Audience{HubIssuerID},
 		Subject:  subject,
-		ID:       id,
+		ID:       "id", // TODO: To validate against generated ID
 		Time:     time.Now().UTC(),
 	})
 	if err != nil {
@@ -82,16 +82,22 @@ func validateJWSHeader(jws *jose.JSONWebSignature, publicKey interface{}) ([]byt
 
 	// validate nonce
 	nonce, ok := jws.Signatures[0].Header.ExtraHeaders[jose.HeaderKey(DidAccessNonceKey)]
-	if !ok || nonce == nil || fmt.Sprintf("%v", nonce) == "" {
+	if !ok || nonce == "" {
 		return nil, errors.New("Crypto [Warning]: Invalid token - missing nonce")
 	}
 
 	return verifiedPayload, nil
 }
 
-// validateJWS will validate the did-access-token in the JWS header. It will create a new token if not found.
+// validateJWS will validate the did-access-token in the JWS message. It will create a new token if not found.
 // this call assumes validateJWSHeader() was called and returned a successful AuthenticationResult
 func validateJWS(jws *jose.JSONWebSignature, pvKey interface{}) (string, bool, error) {
+	var key *ecdsa.PrivateKey
+	var ok bool
+	if key, ok = pvKey.(*ecdsa.PrivateKey); !ok {
+		return "", false, errors.New("Only private keys of type ECDSA is supported")
+	}
+
 	kid := jws.Signatures[0].Header.KeyID
 
 	accessTokenJwe := jws.Signatures[0].Header.ExtraHeaders[jose.HeaderKey(DidAccessTokenKey)]
@@ -104,8 +110,7 @@ func validateJWS(jws *jose.JSONWebSignature, pvKey interface{}) (string, bool, e
 			return "", false, errors.Wrapf(err, "Crypto [Warning]: could not parse Access Token")
 		}
 
-		// using 'kid' as aud in the access token, TODO change subject/id/aud to appropriate values from the DID document(once resolved)
-		err = validateAccessToken(authJWT, pvKey, "subject", "id", kid)
+		err = validateAccessToken(authJWT, key, kid)
 		if err != nil {
 			return "", false, err
 		}
@@ -119,11 +124,8 @@ func validateJWS(jws *jose.JSONWebSignature, pvKey interface{}) (string, bool, e
 
 	accessTknJweStr, err := createNewAccessToken(
 		fmt.Sprintf("%v", nonce),
-		HubIssuerID,
-		"subject", // hardcoded for now (TODO this should probably be the DID id)
-		"id",      // hardcoded for now (TODO this should be the client app id)
-		kid,       // using kid as audience for now (TODO this should be the client app audience id)
-		pvKey)
+		kid,
+		key)
 	if err != nil {
 		return "", false, errors.Wrapf(err, "Crypto [Warning]: could not create Access Token")
 	}

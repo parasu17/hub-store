@@ -33,7 +33,7 @@ func TestKeyProviderFromFile(t *testing.T) {
 	cryptText, err := jwe.CompactSerialize()
 	require.NoError(t, err, "Failed to serialized JWE")
 
-	// Decrypt the encrypted JWE
+	// Decrypt
 	decryptKey := &KeyProviderFromFile{PrivKeyPath: "../../tests/keys/did-server/ec-key.pem"}
 	parsedJWE, err := jose.ParseEncrypted(cryptText)
 	require.NoError(t, err, fmt.Sprintf("Error parsing the encrypted text; err=%s", err))
@@ -132,6 +132,39 @@ func TestMalformattedKeys(t *testing.T) {
 	require.Nil(t, pubKey)
 	require.NotNil(t, err)
 	require.True(t, strings.HasPrefix(err.Error(), "Crypto [Warning]: could not parse public Key"))
+}
+
+func TestRemoteKey(t *testing.T) {
+	kp := &KeyProviderFromFile{
+		PubKeyPath:  "../../tests/keys/did-client/ec-pubKey.pem",
+		PrivKeyPath: "../../tests/keys/did-server/ec-key.pem",
+	}
+	err := kp.AddPublicKeyPath("1", "../../tests/keys/did-client/ec-pubKey.pem")
+	require.Nil(t, err)
+	pk, err := kp.GetRemotePublicKey("1")
+	require.NoError(t, err)
+	require.NotNil(t, pk)
+}
+
+func TestRemoteKeyWithWrongPath(t *testing.T) {
+	kp := &KeyProviderFromFile{
+		PubKeyPath:  "../../tests/keys/did-client/ec-pubKey.pem",
+		PrivKeyPath: "../../tests/keys/did-server/ec-key.pem",
+	}
+	err := kp.AddPublicKeyPath("1", "../../tests/keys/did-client/ec-pubKey.pem.wrong")
+	require.NotNil(t, err)
+}
+
+func TestRemoteKeyWithWrongID(t *testing.T) {
+	kp := &KeyProviderFromFile{
+		PubKeyPath:  "../../tests/keys/did-client/ec-pubKey.pem",
+		PrivKeyPath: "../../tests/keys/did-server/ec-key.pem",
+	}
+	err := kp.AddPublicKeyPath("1", "../../tests/keys/did-client/ec-pubKey.pem")
+	require.Nil(t, err)
+	pk, err := kp.GetRemotePublicKey("2")
+	require.Nil(t, pk)
+	require.NotNil(t, err)
 }
 
 func copyFile(t *testing.T, origFile, newFile string) {

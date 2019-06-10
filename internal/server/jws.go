@@ -85,7 +85,6 @@ func validateJWSHeader(jws *jose.JSONWebSignature, publicKey interface{}) ([]byt
 	if !ok || nonce == "" {
 		return nil, errors.New("Crypto [Warning]: Invalid token - missing nonce")
 	}
-
 	return verifiedPayload, nil
 }
 
@@ -97,7 +96,6 @@ func validateJWS(jws *jose.JSONWebSignature, pvKey interface{}) (string, bool, e
 	if key, ok = pvKey.(*ecdsa.PrivateKey); !ok {
 		return "", false, errors.New("Only private keys of type ECDSA is supported")
 	}
-
 	kid := jws.Signatures[0].Header.KeyID
 
 	accessTokenJwe := jws.Signatures[0].Header.ExtraHeaders[jose.HeaderKey(DidAccessTokenKey)]
@@ -109,6 +107,7 @@ func validateJWS(jws *jose.JSONWebSignature, pvKey interface{}) (string, bool, e
 		if err != nil {
 			return "", false, errors.Wrapf(err, "Crypto [Warning]: could not parse Access Token")
 		}
+
 		err = validateAccessToken(authJWT, key, kid)
 		if err != nil {
 			return "", false, err

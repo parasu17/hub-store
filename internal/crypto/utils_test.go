@@ -25,10 +25,10 @@ type testCase struct {
 func TestParseKey(t *testing.T) {
 	testCases := []testCase{
 		{
-			Name:     "Success case for private key",
-			Success:  true,
-			isPriv:   true,
-			keyPath:  "../../tests/keys/did-server/ec-key.pem",
+			Name:    "Success case for private key",
+			Success: true,
+			isPriv:  true,
+			keyPath: "../../tests/keys/did-server/ec-key.pem",
 		},
 		{
 			Name:       "Fail Parse invalid private key format case",
@@ -43,10 +43,10 @@ func TestParseKey(t *testing.T) {
 			keyContent: "",
 		},
 		{
-			Name:     "Success case for public key",
-			Success:  true,
-			isPriv:   false,
-			keyPath:  "../../tests/keys/did-server/ec-pubKey.pem",
+			Name:    "Success case for public key",
+			Success: true,
+			isPriv:  false,
+			keyPath: "../../tests/keys/did-server/ec-pubKey.pem",
 		},
 		{
 			Name:       "Fail Parse invalid public key case",

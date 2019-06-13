@@ -107,3 +107,15 @@ func getPrivateKeyFromFile(filePath string) (interface{}, error) {
 
 	return pvKey, nil
 }
+
+func TestRandomString(t *testing.T) {
+	arr := make([]string, 1000)
+	for i := 0; i < len(arr); i++ {
+		arr[i] = randomString()
+	}
+	for i := 0; i < (len(arr) - 1); i++ {
+		for j := i + 1; j < len(arr); j++ {
+			require.NotEqual(t, arr[i], arr[j])
+		}
+	}
+}

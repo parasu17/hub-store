@@ -8,6 +8,7 @@ package server
 
 import (
 	"crypto/ecdsa"
+	"math/rand"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,6 +20,8 @@ const (
 	// HubIssuerID represents the ID of the hub (TODO: in the future this should be made configurable for each instance)
 	HubIssuerID = "did:hub:id"
 )
+
+var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 type staticNonceSource string
 
@@ -45,7 +48,7 @@ func createNewAccessToken(nonce, subject string, pvKey *ecdsa.PrivateKey) (strin
 	claims := jwt.Claims{
 		Issuer:    HubIssuerID,
 		Subject:   subject,
-		ID:        "id", // TODO: To generate an ID
+		ID:        randomString(),
 		Audience:  jwt.Audience{HubIssuerID},
 		NotBefore: jwt.NewNumericDate(issuedTime),
 		IssuedAt:  jwt.NewNumericDate(issuedTime),
@@ -73,4 +76,15 @@ func validateAccessToken(accessToken *jwt.JSONWebToken, pvKey *ecdsa.PrivateKey,
 		return errors.Wrapf(err, "Access Token validation failed")
 	}
 	return nil
+}
+
+// randomString creates a random string of a constant length
+func randomString() string {
+	const charset string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const idLength int = 20
+	b := make([]byte, idLength)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
